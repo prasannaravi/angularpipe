@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    stages {
+        stage("Quality Assurance") {
+            agent {
+                docker "weboaks/node-karma-protractor-chrome:headless"
+            }
+
+            stages {
+                stage("Install dependencies") {
+                    steps {
+                        sh "npm ci"
+                    }
+                }
+
+                stage("Build") {
+                    steps {
+                        sh "npm run build"
+                    }
+                }
+
+                stage("Lint") {
+                    steps {
+                        sh "npm run lint"
+                    }
+                }
+
+                stage("Unit tests") {
+                    steps {
+                        sh "npm run test:coverage"
+                    }
+                }
+
+                stage("End-to-end tests") {
+                    steps {
+                        sh "npm run e2e"
+                    }
+                }
+            }
+        }
+
+        stage("Analysis") {
+            agent {
+                docker {
+                    image "noenv/node-sonar-scanner"
+                    args "--network web"
+                }
+            }
+
+            when {
+                branch "master"
+            }
+
+            steps {
+                withSonarQubeEnv("sonar.jmerle.dev") {
+                    sh "sonar-scanner -Dsonar.projectVersion=${BUILD_NUMBER}"
+                }
+            }
+        }
+    }
+}
